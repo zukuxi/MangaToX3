@@ -1,0 +1,240 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131a">
+<title>X3 日漫图片转换器</title>
+<style>
+:root{color-scheme:dark;--bg:#10131a;--panel:#191f2b;--line:#30394a;--text:#edf2fa;--muted:#a8b3c5;--accent:#8bd5ca}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:860px;margin:auto;padding:22px 14px 44px}
+h1{font-size:clamp(23px,5vw,32px);line-height:1.25;margin:0 0 9px}
+.lead,.hint{color:var(--muted)}
+.lead{margin:0 0 18px}
+.hint{font-size:13px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:16px;margin:13px 0}
+.pickers{display:grid;grid-template-columns:1fr;gap:10px}
+button{background:var(--accent);color:#10201f;border:0;border-radius:10px;padding:12px 15px;font-weight:750;font-size:15px;cursor:pointer}
+button:disabled{opacity:.45}
+.secondary{background:#2a3445;color:var(--text)}
+input[type=file]{display:none}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.field{flex:1;min-width:145px}
+label{display:block;font-weight:650;margin-bottom:6px}
+select,input[type=text],input[type=number]{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141d;color:var(--text);font:inherit}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:13px}
+.progress{height:8px;background:#0d1118;border-radius:9px;overflow:hidden;margin:10px 0}
+.bar{height:100%;width:0;background:var(--accent);transition:width .12s}
+.status{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.check{display:flex;align-items:center;gap:8px;margin-top:12px}
+.check input{width:18px;height:18px}
+.preview-viewer{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px}
+.preview-page-wrap{flex:1;min-width:0;max-width:360px;text-align:center}
+.preview-page-label{font-size:13px;color:var(--muted);margin-bottom:8px}
+#preview{display:none;width:100%;max-height:65vh;object-fit:contain;border:1px solid var(--line);background:white}
+.preview-nav{flex:0 0 42px;width:42px;height:54px;padding:0;border:1px solid var(--line);border-radius:10px;background:#2a3445;color:var(--text);font-size:32px;line-height:1;cursor:pointer}
+.preview-nav:disabled{opacity:.35;cursor:default}
+@media(max-width:420px){
+.preview-viewer{gap:6px}
+.preview-nav{flex-basis:34px;width:34px;height:46px}
+.preview-page-wrap{max-width:calc(100% - 80px)}
+}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.range-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.range-value{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:700}
+.range-field{margin-top:14px}
+.footer{font-size:12px;color:var(--muted);margin-top:18px}
+.language-switch{display:flex;justify-content:flex-end;gap:6px;margin-bottom:14px}
+.language-switch button{padding:7px 12px;font-size:13px}
+.language-switch button.active{background:var(--accent);color:#10201f}
+.language-switch button:not(.active){background:#2a3445;color:var(--text)}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="language-switch" aria-label="Language">
+<button type="button" id="langZh" class="active">中文</button>
+<button type="button" id="langEn">English</button>
+</div>
+
+<h1>X3 日漫图片转换器</h1>
+<p class="lead">选择日漫总文件夹，自动裁切白边、识别彩页和双页扫描；单页可保持整页或切成 2/3 个带重叠的横向阅读视窗。保留章节识别、批量合并、XTC/XTCH、预览、图像调节和自动保存等功能。所有处理均在本机浏览器完成，不会上传图片。</p>
+
+<section class="panel">
+<strong>① 选择漫画</strong>
+<p class="hint">请选择包含各章节子文件夹的漫画总文件夹，目录结构应为“漫画名/章节文件夹/图片”。选择后请确认识别到的章节数量；如果显示“未分章图片”或章节数为 0，说明浏览器没有提供完整目录路径，无法自动分章，请换 Chrome 再试。</p>
+<div class="pickers">
+<button id="pickFolder">选择整个漫画文件夹</button>
+<button id="pickFiles" class="secondary">备用：多选图片文件</button>
+</div>
+<input id="folder" type="file" accept="image/*" webkitdirectory directory multiple>
+<input id="files" type="file" accept="image/*" multiple>
+<div class="row" style="margin-top:14px">
+<div class="field">
+<label for="bookTitle">漫画名（可修改）</label>
+<input id="bookTitle" type="text" placeholder="自动使用文件夹名称">
+</div>
+</div>
+<label class="check"><input id="includeCover" type="checkbox" checked>如果有根目录 Cover.jpg，在整部合并模式下作为第一页</label>
+<div id="fileStatus" class="status" style="margin-top:12px">尚未选择漫画。</div>
+</section>
+
+<section class="panel">
+<strong>前 5 页预览</strong>
+<p id="previewStatus" class="hint">选择漫画文件夹后自动生成预览，可用左右箭头查看前 5 页。</p>
+<div class="preview-viewer">
+<button id="previewPrev" type="button" class="preview-nav" aria-label="上一页" disabled>‹</button>
+<div class="preview-page-wrap">
+<div id="previewPageLabel" class="preview-page-label">第 0 / 0 页</div>
+<img id="preview" alt="转换后的 X3 页面预览">
+</div>
+<button id="previewNext" type="button" class="preview-nav" aria-label="下一页" disabled>›</button>
+</div>
+</section>
+
+<section class="panel">
+<strong>② 输出方式</strong>
+<div class="row" style="margin-top:12px">
+<div class="field">
+<label for="outputMode">生成方式</label>
+<select id="outputMode">
+<option value="chapter" selected>每章单独一本（默认）</option>
+<option value="merge">整部合并成一本</option>
+<option value="range">指定章节范围合并</option>
+<option value="batch">每 N 章合并成一本</option>
+</select>
+</div>
+<div class="field">
+<label for="depth">输出格式</label>
+<select id="depth">
+<option value="2">4 灰阶（XTCH）</option>
+<option value="1">黑白（XTC）</option>
+</select>
+</div>
+</div>
+<div id="rangeFields" class="row" style="margin-top:12px;display:none">
+<div class="field">
+<label for="fromChapter">从章节</label>
+<select id="fromChapter"></select>
+</div>
+<div class="field">
+<label for="toChapter">到章节</label>
+<select id="toChapter"></select>
+</div>
+</div>
+<div id="batchFields" class="row" style="margin-top:12px;display:none">
+<div class="field">
+<label for="chaptersPerBook">每本包含章节数</label>
+<select id="chaptersPerBook">
+<option value="1">每 1 章一本</option>
+<option value="2">每 2 章一本</option>
+<option value="5" selected>每 5 章一本</option>
+<option value="10">每 10 章一本</option>
+<option value="20">每 20 章一本</option>
+</select>
+</div>
+</div>
+<p id="modeHint" class="hint">所有图片合并为一个 XTC/XTCH 文件。</p>
+</section>
+
+<section class="panel">
+<strong>③ 日漫分割设置与转换</strong>
+<div class="row" style="margin-top:12px">
+<div class="field">
+<label for="splitParts">单页分割方式</label>
+<select id="splitParts">
+<option value="0">不切分（整页）</option>
+<option value="2">分成 2 份</option>
+<option value="3" selected>分成 3 份</option>
+</select>
+</div>
+<div class="field">
+<label for="splitOverlap">分割重叠像素</label>
+<input id="splitOverlap" type="number" min="0" max="300" value="48">
+</div>
+<div class="field">
+<label for="keepFirstPages">封面之后前几页保持竖屏不分割</label>
+<input id="keepFirstPages" type="number" min="0" max="30" value="3">
+</div>
+</div>
+<label class="check"><input id="doublePage" type="checkbox">整本双页扫描（强制先从中缝分成右页、左页，再按上面的设置处理）</label>
+<div class="row" style="margin-top:12px">
+<div class="field">
+<label for="trimMode">白边裁切</label>
+<select id="trimMode">
+<option value="normal">普通</option>
+<option value="strong" selected>积极（推荐，尽量裁掉边缘水印）</option>
+</select>
+</div>
+</div>
+<p class="hint">彩页自动整页保留。宽幅扫描默认尝试检测白色中缝，识别成功时按日漫顺序先输出右页、再输出左页；勾选“整本双页扫描”则即使没有明显白缝也会按中线分开。单页切分使用 imagesplittest 的重叠视窗和切线避让算法。封面始终不切分；也可设置前 N 张图片不切分。</p>
+
+<div class="row" style="margin-top:12px">
+<div class="field">
+<label for="dither">抖动算法</label>
+<select id="dither">
+<option value="atkinson" selected>Atkinson（漫画推荐）</option>
+<option value="floyd">Floyd–Steinberg</option>
+<option value="sierra-lite">Sierra Lite（轻柔）</option>
+<option value="ordered">Ordered / Bayer 4×4（规则网点）</option>
+<option value="none">无抖动</option>
+</select>
+</div>
+<div class="field">
+<label for="contrast">对比度</label>
+<select id="contrast">
+<option value="none" selected>None（无增强）</option>
+<option value="light">Light（轻微）</option>
+<option value="medium">Medium（中等）</option>
+<option value="strong">Strong（较强）</option>
+<option value="maximum">Maximum（最大）</option>
+</select>
+</div>
+</div>
+
+<div class="range-field">
+<div class="range-head">
+<label for="brightness">亮度</label>
+<span id="brightnessValue" class="range-value">0</span>
+</div>
+<input id="brightness" type="range" min="-50" max="50" step="1" value="0">
+<p class="hint">负值变暗，正值变亮；默认 0。</p>
+</div>
+
+<div class="range-field">
+<div class="range-head">
+<label for="ditherStrength">抖动强度</label>
+<span id="ditherStrengthValue" class="range-value">100%</span>
+</div>
+<input id="ditherStrength" type="range" min="0" max="100" step="5" value="100">
+<p class="hint">控制误差扩散的强弱；0% 不扩散误差，100% 使用完整算法强度。Ordered 和无抖动模式不使用误差扩散。</p>
+</div>
+
+<div class="range-field">
+<div class="range-head">
+<label for="threshold">黑白阈值</label>
+<span id="thresholdValue" class="range-value">128</span>
+</div>
+<input id="threshold" type="range" min="64" max="192" step="1" value="128">
+<p class="hint">仅在黑白（XTC）模式下生效。数值较低时更容易变白，较高时更容易变黑。</p>
+</div>
+
+<div class="actions">
+<button id="go" disabled>开始转换</button>
+<button id="cancel" class="secondary" disabled>取消</button>
+</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div id="status" class="status">请先选择漫画文件夹。</div>
+</section>
+
+<p class="footer">编码逻辑参考 srokl/xtcjsapp（MIT）；日漫分割算法参考本项目配套的 imagesplittest。</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="module" src="./app.js?v=4.0"></script>
+</body>
+</html>
