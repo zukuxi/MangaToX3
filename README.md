@@ -4,6 +4,10 @@
 
 Convert Japanese manga image folders, PDF, ZIP, CBZ and EPUB files into XTC / XTCH files for Xteink X3. All image processing runs locally in the browser; manga images are never uploaded.
 
+
+https://zukuxi.github.io/MangaToX3/
+
+
 ## 功能 / Features
 
 - 支持图片文件夹、多选图片，以及 PDF / ZIP / CBZ / EPUB 单文件输入。
