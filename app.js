@@ -1,5 +1,5 @@
 
-// X3 Japanese Manga Image Converter V4.0
+// X3 Japanese Manga Converter V4.1 — PDF / ZIP / CBZ / EPUB input
 // Sequential processing, grouped books, image controls and arrow-based preview.
 
 const W=528,H=792,$=id=>document.getElementById(id);
@@ -10,7 +10,9 @@ const folderInput=$('folder'),filesInput=$('files'),go=$('go'),
  cancel=$('cancel'),status=$('status'),bar=$('bar'),preview=$('preview');
 
 const collator=new Intl.Collator('zh-CN',{numeric:true,sensitivity:'base'});
-const imageExt=/\.(jpe?g|png|webp|bmp|gif|avif)$/i;
+const imageExt=/\.(jpe?g|png|webp|bmp|gif|avif|tiff?)$/i;
+const archiveExt=/\.(zip|cbz|epub)$/i;
+let zipModulePromise=null,pdfModulePromise=null;
 
 $('pickFolder').addEventListener('click',()=>folderInput.click());
 $('pickFiles').addEventListener('click',()=>filesInput.click());
@@ -63,38 +65,148 @@ cancel.addEventListener('click',()=>{
 updateModeUI();
 
 function pathOf(f){return f.webkitRelativePath||f.name}
+async function disposeVirtualFiles(files){for(const f of files||[])if(typeof f.__dispose==='function'){await f.__dispose();f.__dispose=null;}}
 
 function isImage(f){
  return imageExt.test(f.name)&&(!f.type||f.type.startsWith('image/'));
 }
 
-function acceptFiles(files,fromFolder){
+async function acceptFiles(files,fromFolder){
  if(converting)return;
-
- selectedFiles=files.filter(isImage)
-  .sort((a,b)=>collator.compare(pathOf(a),pathOf(b)));
-
- if(!selectedFiles.length){
-  $('fileStatus').textContent='没有找到支持的图片。请确认文件夹中有 JPG、PNG、WebP 等图片。';
-  go.disabled=true;
-  previewRequest++;
-  previewBuilding=false;
-  previewImages=[];
-  showPreviewPage(0);
-  return;
+ previewRequest++;
+ await disposeVirtualFiles(selectedFiles);
+ selectedFiles=[];
+ $('fileStatus').textContent='正在读取文件并建立页面索引……';
+ go.disabled=true;
+ try{
+  const expanded=[];
+  for(const file of files){
+   if(isImage(file)) expanded.push(file);
+   else if(/\.pdf$/i.test(file.name)) expanded.push(...await expandPdf(file));
+   else if(archiveExt.test(file.name)) expanded.push(...await expandArchive(file));
+  }
+  selectedFiles=expanded.sort((a,b)=>collator.compare(pathOf(a),pathOf(b)));
+  if(!selectedFiles.length){
+   $('fileStatus').textContent='没有找到支持的图片或漫画文件。支持 JPG、PNG、WebP、PDF、ZIP、CBZ、EPUB。';
+   go.disabled=true;previewRequest++;previewBuilding=false;previewImages=[];showPreviewPage(0);return;
+  }
+  const first=files[0];
+  const baseName=first.name.replace(/\.[^.]+$/,'');
+  $('bookTitle').value=fromFolder&&pathOf(selectedFiles[0]).split('/').length>1
+   ?pathOf(selectedFiles[0]).split('/')[0]:baseName;
+  fillChapterChoices();renderFileStatus();updateModeUI();renderLivePreview();
+ }catch(err){
+  selectedFiles=[];go.disabled=true;
+  $('fileStatus').textContent='读取失败：'+(err?.message||err);
+  console.error(err);
  }
+}
 
- const parts=pathOf(selectedFiles[0]).split('/');
- $('bookTitle').value=(
-  fromFolder&&parts.length>1
-   ?parts[0]
-   :selectedFiles[0].name.replace(/\.[^.]+$/,'')
- )||'漫画';
+function virtualPage(name,relativePath,loader){
+ return {name,webkitRelativePath:relativePath,__loadImage:loader};
+}
 
- fillChapterChoices();
- renderFileStatus();
- updateModeUI();
- renderLivePreview();
+async function getZipModule(){
+ if(!zipModulePromise)zipModulePromise=import('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.8.21/+esm');
+ return zipModulePromise;
+}
+async function getPdfModule(){
+ if(!pdfModulePromise)pdfModulePromise=import('https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/legacy/build/pdf.mjs');
+ return pdfModulePromise;
+}
+
+async function expandPdf(file){
+ const pdfjs=await getPdfModule();
+ pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.worker.mjs';
+ const data=new Uint8Array(await file.arrayBuffer());
+ const task=pdfjs.getDocument({data,disableAutoFetch:true,disableStream:true,isEvalSupported:false});
+ const pdf=await task.promise;
+ const book=safeName(file.name.replace(/\.pdf$/i,''));
+ const pages=[];
+ for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+  const n=pageNo;
+  pages.push(virtualPage(String(n).padStart(5,'0')+'.pdfpage',book+'/'+book+'/'+String(n).padStart(5,'0')+'.jpg',async()=>{
+   const page=await pdf.getPage(n);
+   const viewport=page.getViewport({scale:1.5});
+   const canvas=document.createElement('canvas');
+   canvas.width=Math.max(1,Math.ceil(viewport.width));canvas.height=Math.max(1,Math.ceil(viewport.height));
+   const ctx=canvas.getContext('2d',{willReadFrequently:true});
+   await page.render({canvasContext:ctx,viewport,background:'rgb(255,255,255)'}).promise;
+   page.cleanup();
+   return canvas;
+  }));
+ }
+ // PDF document stays available for lazy page rendering; release after this book is processed.
+ let disposed=false;const dispose=async()=>{if(disposed)return;disposed=true;try{await pdf.destroy()}catch(_){}};
+ pages.forEach(f=>f.__dispose=dispose);
+ return pages;
+}
+
+function normalizeZipPath(path){
+ const out=[];
+ for(const part of path.replace(/\\/g,'/').split('/')){
+  if(!part||part==='.')continue;
+  if(part==='..')out.pop();else out.push(part);
+ }
+ return out.join('/');
+}
+async function expandArchive(file){
+ const {ZipReader,BlobReader,BlobWriter,TextWriter}=await getZipModule();
+ const reader=new ZipReader(new BlobReader(file));
+ try{
+  const entries=await reader.getEntries();
+  const byName=new Map(entries.filter(e=>!e.directory).map(e=>[normalizeZipPath(e.filename),e]));
+  let imagePaths=[];
+  const isImg=p=>imageExt.test(p);
+  if(/\.epub$/i.test(file.name)){
+   // EPUB: prefer OPF spine order (including XHTML image references), then append remaining images.
+   let opfPath=null,opfText='';
+   const container=byName.get('META-INF/container.xml');
+   if(container?.getData){const t=await container.getData(new TextWriter());const xml=new DOMParser().parseFromString(t,'application/xml');opfPath=xml.querySelector('rootfile')?.getAttribute('full-path')||null;}
+   if(opfPath&&byName.has(normalizeZipPath(opfPath))){
+    const opfEntry=byName.get(normalizeZipPath(opfPath));opfText=await opfEntry.getData(new TextWriter());
+    const xml=new DOMParser().parseFromString(opfText,'application/xml');
+    const base=normalizeZipPath(opfPath).split('/').slice(0,-1).join('/');
+    const resolve=(href)=>normalizeZipPath((base?base+'/':'')+decodeURIComponent(href.split('#')[0]));
+    const manifest=new Map();
+    xml.querySelectorAll('manifest item').forEach(item=>manifest.set(item.getAttribute('id'),{href:item.getAttribute('href'),type:item.getAttribute('media-type')||''}));
+    for(const ref of xml.querySelectorAll('spine itemref')){
+     const item=manifest.get(ref.getAttribute('idref'));if(!item)continue;
+     const path=resolve(item.href||'');
+     if(isImg(path)){imagePaths.push(path);continue;}
+     const entry=byName.get(path);
+     if(entry&&/xhtml|html/i.test(item.type||path)){
+      try{const html=await entry.getData(new TextWriter());const doc=new DOMParser().parseFromString(html,'text/html');
+       for(const el of doc.querySelectorAll('img[src],image[href],image')){const href=el.getAttribute('src')||el.getAttribute('href')||el.getAttribute('xlink:href');if(href){const candidate=normalizeZipPath(path.split('/').slice(0,-1).concat(href.split('#')[0]).join('/'));if(isImg(candidate))imagePaths.push(candidate);}}
+      }catch(_){}
+     }
+    }
+    for(const item of manifest.values()){const path=resolve(item.href||'');if(isImg(path))imagePaths.push(path);}
+   }
+  }
+  if(!imagePaths.length)imagePaths=entries.filter(e=>!e.directory&&isImg(normalizeZipPath(e.filename))).map(e=>normalizeZipPath(e.filename)).sort((a,b)=>collator.compare(a,b));
+  imagePaths=[...new Set(imagePaths)].filter(p=>byName.has(p));
+  if(!imagePaths.length)throw new Error('压缩包中没有找到漫画图片。');
+  const book=safeName(file.name.replace(/\.(zip|cbz|epub)$/i,''));
+  const firstParts=imagePaths[0]?.split('/')||[];
+  const commonRoot=firstParts.length>1&&imagePaths.every(p=>p.split('/')[0]===firstParts[0])?firstParts[0]:null;
+  const pages=imagePaths.map((path,index)=>{
+   const entry=byName.get(path);const short=path.split('/').pop()||('page-'+index+'.jpg');
+   const normalized=commonRoot?path.split('/').slice(1).join('/'):path;
+   const rel=/\.epub$/i.test(file.name)
+    ?book+'/'+book+'/'+String(index).padStart(6,'0')+'_'+short
+    :book+'/'+(normalized.includes('/')?normalized:book+'/'+normalized);
+   return virtualPage(short,rel,async()=>{
+    const blob=await entry.getData(new BlobWriter());
+    const url=URL.createObjectURL(blob);const img=new Image();
+    try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('无法解码图片：'+short));img.src=url;});return img;}
+    finally{URL.revokeObjectURL(url);}
+   });
+  });
+  let disposed=false;const dispose=async()=>{if(disposed)return;disposed=true;try{await reader.close()}catch(_){}};
+  pages.forEach(f=>f.__dispose=dispose);
+  return pages;
+ }catch(e){try{await reader.close()}catch(_){};throw e;}
 }
 
 function isRootCover(f){
@@ -450,6 +562,7 @@ async function makeBook(
    const img=await loadImage(file);
    const source=mangaCanvas(img.naturalWidth||img.width,img.naturalHeight||img.height);
    source.getContext('2d').drawImage(img,0,0);img.src='';
+   if(file.__loadImage){try{img.width=1;img.height=1;}catch(_){}}
    const keepPortrait=isRootCover(file)||inputPageIndex<keepFirst;
    const outputCanvases=mangaProcessImage(source,{...options,keepPortrait});
    source.width=1;source.height=1;
@@ -741,7 +854,8 @@ function buildBook(pages,is2,title){
  return out;
 }
 
-function loadImage(file){
+async function loadImage(file){
+ if(file&&typeof file.__loadImage==='function')return file.__loadImage();
  return new Promise((resolve,reject)=>{
   const url=URL.createObjectURL(file),img=new Image();
 
@@ -1060,7 +1174,7 @@ go.addEventListener('click',async()=>{
   if (!zh || !en) return;
 
   const translations = [
-    ['X3 日漫图片转换器', 'X3 Japanese Manga Image Converter'],
+    ['X3 日漫转换器（图片 / PDF / ZIP / EPUB / CBZ）', 'X3 Japanese Manga Converter (Images / PDF / ZIP / EPUB / CBZ)'],
     ['选择日漫总文件夹，自动裁切白边、识别彩页和双页扫描；单页可保持整页或切成 2/3 个带重叠的横向阅读视窗。保留章节识别、批量合并、XTC/XTCH、预览、图像调节和自动保存等功能。所有处理均在本机浏览器完成，不会上传图片。', 'Select a Japanese manga folder. The converter trims white borders, detects color pages and double-page scans, and can keep a page whole or split it into 2/3 overlapping landscape-reading views. Chapter handling, batch merging, XTC/XTCH output, previews, image adjustments, and automatic saving are retained. Everything runs locally in your browser; images are never uploaded.'],
     ['只需选择一次漫画总文件夹。程序逐张读取图片，按章节顺序自动处理；支持每章一本、每 N 章一本或整部合并。支持时可选择一次输出文件夹，自动保存全部成品；否则最后生成一个 ZIP。所有处理都在本机浏览器进行，不会上传图片。',
      'Select the manga folder once. Images are processed sequentially in chapter order. Create one book per chapter, combine every N chapters, or merge the entire series. Where supported, choose an output folder to save all books; otherwise, download one ZIP. All processing happens locally in your browser. Images are never uploaded.'],
@@ -1074,7 +1188,7 @@ go.addEventListener('click',async()=>{
     ['如果有根目录 Cover.jpg，在整部合并模式下作为第一页', 'Use root Cover.jpg as the first page when merging the entire series'],
     ['尚未选择漫画。', 'No manga selected.'],
     ['前 5 页预览', 'Preview First 5 Pages'],
-    ['选择漫画文件夹后自动生成预览，可用左右箭头查看前 5 页。', 'A preview is generated after selecting a folder. Use the arrows to view up to 5 pages.'],
+    ['选择文件夹或漫画文件后自动生成预览，可用左右箭头查看前 5 页。', 'A preview is generated after selecting a folder or manga file. Use the arrows to view up to 5 pages.'],
     ['第 0 / 0 页', 'Page 0 / 0'],
     ['② 输出方式', '② Output Options'],
     ['生成方式', 'Output Mode'],
@@ -1119,7 +1233,7 @@ go.addEventListener('click',async()=>{
      'Only applies to black-and-white (XTC) mode. Lower values produce more white; higher values produce more black.'],
     ['开始转换', 'Start Conversion'],
     ['取消', 'Cancel'],
-    ['请先选择漫画文件夹。', 'Please select a manga folder first.'],
+    ['请先选择漫画文件夹或漫画文件。', 'Please select a manga folder or manga file first.'],
     ['编码逻辑参考 srokl/xtcjsapp（MIT）及本项目现有实现。',
      'Encoding logic is based on srokl/xtcjsapp (MIT) and this project’s existing implementation.']
   ];
@@ -1166,8 +1280,8 @@ go.addEventListener('click',async()=>{
     }
 
     document.title = toEnglish
-      ? 'X3 Japanese Manga Image Converter'
-      : 'X3 日漫图片转换器';
+      ? 'X3 Japanese Manga Converter (Images / PDF / ZIP / EPUB / CBZ)'
+      : 'X3 日漫转换器（图片 / PDF / ZIP / EPUB / CBZ）';
 
     const prev = document.getElementById('previewPrev');
     const next = document.getElementById('previewNext');

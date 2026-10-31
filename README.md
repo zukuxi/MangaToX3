@@ -1,12 +1,15 @@
-# X3 日漫图片转换器 / X3 Japanese Manga Image Converter
+# X3 日漫转换器 / X3 Japanese Manga Converter
 
-将日漫图片文件夹转换为 Xteink X3 可读取的 XTC / XTCH 文件。所有图像处理均在浏览器本地完成，不会上传漫画图片。
+将日漫图片文件夹、PDF、ZIP、CBZ、EPUB 转换为 Xteink X3 可读取的 XTC / XTCH 文件。所有图像处理均在浏览器本地完成，不会上传漫画图片。
 
-Convert Japanese manga image folders into XTC / XTCH files for Xteink X3. All image processing runs locally in the browser; manga images are never uploaded.
+Convert Japanese manga image folders, PDF, ZIP, CBZ and EPUB files into XTC / XTCH files for Xteink X3. All image processing runs locally in the browser; manga images are never uploaded.
 
 ## 功能 / Features
 
-- 保留原项目的文件夹读取、章节识别、自然数字排序。
+- 支持图片文件夹、多选图片，以及 PDF / ZIP / CBZ / EPUB 单文件输入。
+- PDF 使用 PDF.js 逐页渲染；ZIP / CBZ / EPUB 使用 zip.js 按需读取图片，不会一次性解压全部图片。
+- EPUB 优先按 OPF spine 阅读顺序提取图片，并兼容 XHTML 中引用的漫画图片。
+- 保留文件夹读取、章节识别、自然数字排序。
 - 每章单独一本、整部合并、指定章节范围合并、每 N 章合并。
 - 输出 XTC（黑白）或 XTCH（4 灰阶）。
 - 保留 Atkinson、Floyd–Steinberg、Sierra Lite、Ordered、无抖动，以及亮度、对比度、阈值、抖动强度设置。
@@ -22,12 +25,20 @@ Convert Japanese manga image folders into XTC / XTCH files for Xteink X3. All im
 ## 使用 / Usage
 
 1. 打开 GitHub Pages 页面。
-2. 选择包含章节子文件夹的漫画总文件夹；也可多选图片文件。
+2. 选择包含章节子文件夹的漫画总文件夹；也可直接选择 PDF、ZIP、CBZ、EPUB，或多选图片文件。
 3. 检查章节识别结果和前 5 页预览。
 4. 在“日漫分割设置”中选择单页整页、2 份或 3 份；按需开启双页扫描、调整重叠像素和白边裁切。
 5. 默认封面不切分，默认封面之后前 3 张图片保持竖屏，可按漫画情况修改。
 6. 选择每章一本、整部合并、章节范围或每 N 章合并。
 7. 选择 XTC / XTCH 和图像参数，点击开始转换。
+
+## 版本 / Version
+
+V4.1：新增 PDF、ZIP、CBZ、EPUB 输入；原有图片文件夹、日漫分割和 XTC / XTCH 输出流程保持不变。
+
+## 文件读取 / Input readers
+
+PDF 使用 PDF.js；ZIP / CBZ / EPUB 使用 zip.js。压缩包只建立文件索引，转换时才读取当前图片；PDF 页面按需渲染。每张页面处理完成后释放临时图片与 Canvas，避免将整本漫画的解码图片同时放入内存。第三方库通过 CDN 按需加载。
 
 ## 分割算法 / Splitting algorithm
 
@@ -37,7 +48,7 @@ The manga splitting logic follows the companion `zukuxi/imagesplittest` tool: co
 
 ## Credits / 致谢
 
-- Original XTC encoding reference: [srokl/xtcjsapp](https://github.com/srokl/xtcjsapp) (MIT).
+- Original XTC encoding and reader implementation reference: [srokl/xtcjsapp](https://github.com/srokl/xtcjsapp) (MIT). PDF.js and zip.js are loaded from their published CDN packages.
 - Japanese manga splitting method: [zukuxi/imagesplittest](https://github.com/zukuxi/imagesplittest).
 
 ## License
