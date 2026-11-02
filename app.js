@@ -36,7 +36,7 @@ $('depth').addEventListener('change',updateCurrentPreview);
 $('dither').addEventListener('change',updateCurrentPreview);
 $('contrast').addEventListener('change',updateCurrentPreview);
 
-for(const id of ['splitParts','doublePage','splitOverlap','trimMode','keepFirstPages'])$(id).addEventListener('change',renderLivePreview);
+for(const id of ['splitParts','doublePage','splitOverlap','trimMode','scaleMode','keepFirstPages'])$(id).addEventListener('change',renderLivePreview);
 
 for(const id of ['brightness','ditherStrength','threshold']){
  $(id).addEventListener('input',()=>{
@@ -418,11 +418,18 @@ function mangaRotate90(s){
  x.translate(c.width/2,c.height/2);x.rotate(Math.PI/2);
  x.drawImage(s,-s.width/2,-s.height/2);return c;
 }
-function mangaMakePage(s){
+function mangaMakePage(s,preserveAspect=false){
  const c=mangaCanvas(W,H),x=c.getContext('2d');
  x.fillStyle='#fff';x.fillRect(0,0,W,H);
  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
- x.drawImage(s,0,0,W,H);return c;
+ if(preserveAspect){
+  const scale=Math.min(W/s.width,H/s.height);
+  const w=Math.max(1,Math.round(s.width*scale)),h=Math.max(1,Math.round(s.height*scale));
+  x.drawImage(s,Math.round((W-w)/2),Math.round((H-h)/2),w,h);
+ }else{
+  x.drawImage(s,0,0,W,H);
+ }
+ return c;
 }
 function mangaGray(s,maxW=420,maxH=640){
  const scale=Math.min(1,maxW/s.width,maxH/s.height);
@@ -482,11 +489,11 @@ function mangaDetectSpreadGutter(s){
  if(ink(best-w*.045,best-w*.012)<.012||ink(best+w*.012,best+w*.045)<.012)return null;
  return Math.round(best/scale);
 }
-function mangaViews(s,count,overlap){
+function mangaViews(s,count,overlap,preserveAspect=false){
  const baseH=Math.max(1,Math.round(s.width*2/3));
  const extra=Math.min(300,Math.max(0,overlap));
  const vh=Math.min(s.height,baseH+extra),max=s.height-vh,tops=[];
- if(count<=1)return[{canvas:mangaMakePage(s)}];
+ if(count<=1)return[{canvas:mangaMakePage(s,preserveAspect)}];
  for(let i=0;i<count;i++)tops.push(Math.round(max*i/(count-1)));
  // 与 imagesplittest 一致：在预定切分线附近寻找横向墨线较少的位置，
  // 避开对白框轮廓和横向分格线，同时保留相邻视窗重叠。
@@ -507,14 +514,15 @@ function mangaViews(s,count,overlap){
    tops[i]=Math.round(best/scale);
   }
  }
- return tops.map((t,i)=>({canvas:mangaMakePage(mangaRotate90(mangaCrop(s,0,t,s.width,Math.min(vh,s.height-t)))),index:i+1}));
+ return tops.map((t,i)=>({canvas:mangaMakePage(mangaRotate90(mangaCrop(s,0,t,s.width,Math.min(vh,s.height-t))),preserveAspect),index:i+1}));
 }
 function mangaProcessImage(source,options){
  const mode=options.parts,overlap=options.overlap,forceSpread=options.doublePage,keepPortrait=options.keepPortrait;
+ const preserveAspect=!!options.preserveAspect&&!keepPortrait;
  const color=mangaColorPage(source);
  let base=color?source:mangaTrimWhite(source),gutter=null,pages;
  if(color||keepPortrait){
-  return [mangaMakePage(base)];
+  return [mangaMakePage(base,preserveAspect)];
  }
  if(forceSpread){
   const spread=source;
@@ -536,8 +544,8 @@ function mangaProcessImage(source,options){
  }
  const outputs=[];
  for(const side of pages){
-  if(mode===0)outputs.push(mangaMakePage(side));
-  else outputs.push(...mangaViews(side,mode,overlap).map(x=>x.canvas));
+  if(mode===0)outputs.push(mangaMakePage(side,preserveAspect));
+  else outputs.push(...mangaViews(side,mode,overlap,preserveAspect).map(x=>x.canvas));
  }
  return outputs;
 }
@@ -552,7 +560,8 @@ async function makeBook(
  const options={
   parts:Number($('splitParts').value),
   doublePage:$('doublePage').checked,
-  overlap:Number($('splitOverlap').value)||0
+  overlap:Number($('splitOverlap').value)||0,
+  preserveAspect:$('scaleMode').value==='contain'
  };
  const keepFirst=Math.max(0,Number($('keepFirstPages').value)||0);
  for(const chapter of chapters){
@@ -954,7 +963,7 @@ function showPreviewPage(index){
  renderCurrentPreviewPage();
 }
 
-// 按正式转换的拼接、分页和章节补白方式生成最多 5 页原始灰度预览。
+// 按正式转换的拼接、分页和章节补白方式生成最多 10 页原始灰度预览。
 async function renderLivePreview(){
  if(converting)return;
  const request=++previewRequest,previewStatus=$('previewStatus');
@@ -964,13 +973,13 @@ async function renderLivePreview(){
   return;
  }
  previewBuilding=true;previewImages=[];showPreviewPage(0);
- if(previewStatus)previewStatus.textContent='正在生成前 5 页预览……';
+ if(previewStatus)previewStatus.textContent='正在生成前 10 页预览……';
  try{
   const groups=getGroups().filter(g=>g.files&&g.files.length);
   if(!groups.length)throw new Error('当前设置下没有可预览的图片。');
   const group=groups[0];
   const chapters=group.chapters&&group.chapters.length?group.chapters:[{name:group.name||'图片',files:group.files||[]}];
-  const options={parts:Number($('splitParts').value),doublePage:$('doublePage').checked,overlap:Number($('splitOverlap').value)||0};
+  const options={parts:Number($('splitParts').value),doublePage:$('doublePage').checked,overlap:Number($('splitOverlap').value)||0,preserveAspect:$('scaleMode').value==='contain'};
   const keepFirst=Math.max(0,Number($('keepFirstPages').value)||0);
   let inputPageIndex=0,finished=false;
   for(const chapter of chapters){
@@ -985,9 +994,9 @@ async function renderLivePreview(){
     source.width=1;source.height=1;
     for(const pageCanvas of outputCanvases){
      if(request!==previewRequest){pageCanvas.width=1;pageCanvas.height=1;break;}
-     if(previewImages.length<5)previewImages.push(canvasToGray(pageCanvas));
+     if(previewImages.length<10)previewImages.push(canvasToGray(pageCanvas));
      pageCanvas.width=1;pageCanvas.height=1;
-     if(previewImages.length>=5){finished=true;break;}
+     if(previewImages.length>=10){finished=true;break;}
     }
     if(!isRootCover(file))inputPageIndex++;
     await yieldUI();
@@ -1187,8 +1196,8 @@ go.addEventListener('click',async()=>{
     ['自动使用文件夹名称', 'Uses folder name automatically'],
     ['如果有根目录 Cover.jpg，在整部合并模式下作为第一页', 'Use root Cover.jpg as the first page when merging the entire series'],
     ['尚未选择漫画。', 'No manga selected.'],
-    ['前 5 页预览', 'Preview First 5 Pages'],
-    ['选择文件夹或漫画文件后自动生成预览，可用左右箭头查看前 5 页。', 'A preview is generated after selecting a folder or manga file. Use the arrows to view up to 5 pages.'],
+    ['前 10 页预览', 'Preview First 10 Pages'],
+    ['选择文件夹或漫画文件后自动生成预览，可用左右箭头查看前 10 页。', 'A preview is generated after selecting a folder or manga file. Use the arrows to view up to 10 pages.'],
     ['第 0 / 0 页', 'Page 0 / 0'],
     ['② 输出方式', '② Output Options'],
     ['生成方式', 'Output Mode'],

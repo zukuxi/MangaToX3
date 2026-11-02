@@ -84,8 +84,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 </section>
 
 <section class="panel">
-<strong>前 5 页预览</strong>
-<p id="previewStatus" class="hint">选择文件夹或漫画文件后自动生成预览，可用左右箭头查看前 5 页。</p>
+<strong>前 10 页预览</strong>
+<p id="previewStatus" class="hint">选择文件夹或漫画文件后自动生成预览，可用左右箭头查看前 10 页。</p>
 <div class="preview-viewer">
 <button id="previewPrev" type="button" class="preview-nav" aria-label="上一页" disabled>‹</button>
 <div class="preview-page-wrap">
@@ -164,14 +164,21 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <label class="check"><input id="doublePage" type="checkbox">整本双页扫描（强制先从中缝分成右页、左页，再按上面的设置处理）</label>
 <div class="row" style="margin-top:12px">
 <div class="field">
+<label for="scaleMode">图片缩放方式</label>
+<select id="scaleMode">
+<option value="fill" selected>铺满屏幕（推荐）</option>
+<option value="contain">保持原图比例（切割后也保持比例）</option>
+</select>
+</div>
+<div class="field">
 <label for="trimMode">白边裁切</label>
 <select id="trimMode">
-<option value="normal">普通</option>
-<option value="strong" selected>积极（推荐，尽量裁掉边缘水印）</option>
+<option value="normal" selected>普通（推荐）</option>
+<option value="strong">积极（尽量裁掉边缘水印）</option>
 </select>
 </div>
 </div>
-<p class="hint">彩页自动整页保留。宽幅扫描默认尝试检测白色中缝，识别成功时按日漫顺序先输出右页、再输出左页；勾选“整本双页扫描”则即使没有明显白缝也会按中线分开。单页切分使用 imagesplittest 的重叠视窗和切线避让算法。封面始终不切分；也可设置前 N 张图片不切分。</p>
+<p class="hint">彩页自动整页保留。铺满屏幕会将页面填满 X3；保持原图比例会等比缩放并在空余处留白，分成 2 份或 3 份时同样生效。宽幅扫描默认尝试检测白色中缝，识别成功时按日漫顺序先输出右页、再输出左页；勾选“整本双页扫描”则即使没有明显白缝也会按中线分开。单页切分使用重叠视窗和切线避让算法。封面始终不切分；也可设置前 N 张图片不切分。</p>
 
 <div class="row" style="margin-top:12px">
 <div class="field">
