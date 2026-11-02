@@ -1191,6 +1191,18 @@ go.addEventListener('click',async()=>{
 });
 
 
+// 保持原图比例时才显示用户可调的重叠像素；铺满屏幕使用内部切线参数。
+(() => {
+  const scaleMode = document.getElementById('scaleMode');
+  const overlapField = document.getElementById('splitOverlapField');
+  if (!scaleMode || !overlapField) return;
+  const updateOverlapField = () => {
+    overlapField.hidden = scaleMode.value === 'fill';
+  };
+  scaleMode.addEventListener('change', updateOverlapField);
+  updateOverlapField();
+})();
+
 // ===== 中英文界面切换：不修改转换算法 =====
 (() => {
   const zh = document.getElementById('langZh');
@@ -1199,6 +1211,31 @@ go.addEventListener('click',async()=>{
   if (!zh || !en) return;
 
   const translations = [
+    // Full phrases come first so shorter word replacements cannot leave mixed-language labels.
+    ['③ 日漫分割设置与转换', '③ Japanese Manga Splitting & Conversion'],
+    ['整本双页扫描（强制先从中缝分成右页、左页，再按上面的设置处理）', 'Whole-book double-page scans (force a center split into right and left pages before applying the settings below)'],
+    ['编码逻辑参考 srokl/xtcjsapp（MIT）；日漫分割算法参考本项目配套的 imagesplittest。', 'Encoding logic references srokl/xtcjsapp (MIT); the Japanese manga splitting algorithm references the companion imagesplittest tool.'],
+    ['无抖动', 'No dithering'],
+    ['保持原图比例（默认）', 'Preserve original aspect ratio (default)'],
+    ['普通（推荐）', 'Normal (recommended)'],
+    ['积极（尽量裁掉边缘水印）', 'Aggressive (trim edge watermarks where possible)'],
+    ['Atkinson（漫画推荐）', 'Atkinson (recommended for manga)'],
+    ['Sierra Lite（轻柔）', 'Sierra Lite (soft)'],
+    ['Ordered / Bayer 4×4（规则网点）', 'Ordered / Bayer 4×4 (ordered pattern)'],
+    ['None（无增强）', 'None (no enhancement)'],
+    ['Light（轻微）', 'Light'],
+    ['Medium（中等）', 'Medium'],
+    ['Strong（较强）', 'Strong'],
+    ['Maximum（最大）', 'Maximum'],
+    ['不切分（整页）', 'Keep full page (no splitting)'],
+    ['分成 2 份', 'Split into 2 views'],
+    ['分成 3 份', 'Split into 3 views'],
+    ['封面之后前几页保持竖屏不分割', 'Keep the first pages after the cover in portrait orientation (no splitting)'],
+    ['图片缩放方式', 'Image scaling mode'],
+    ['铺满屏幕', 'Fill screen'],
+    ['保持原图比例（默认）', 'Preserve original aspect ratio (default)'],
+    ['白边裁切', 'White-border trimming'],
+    ['③ 日漫分割设置与转换', '③ Japanese Manga Splitting & Conversion'],
     ['X3 日漫转换器（图片 / PDF / ZIP / EPUB / CBZ）', 'X3 Japanese Manga Converter (Images / PDF / ZIP / EPUB / CBZ)'],
     ['选择日漫总文件夹，自动裁切白边、识别彩页和双页扫描；单页可保持整页或切成 2/3 个带重叠的横向阅读视窗。保留章节识别、批量合并、XTC/XTCH、预览、图像调节和自动保存等功能。所有处理均在本机浏览器完成，不会上传图片。', 'Select a Japanese manga folder. The converter trims white borders, detects color pages and double-page scans, and can keep a page whole or split it into 2/3 overlapping landscape-reading views. Chapter handling, batch merging, XTC/XTCH output, previews, image adjustments, and automatic saving are retained. Everything runs locally in your browser; images are never uploaded.'],
     ['只需选择一次漫画总文件夹。程序逐张读取图片，按章节顺序自动处理；支持每章一本、每 N 章一本或整部合并。支持时可选择一次输出文件夹，自动保存全部成品；否则最后生成一个 ZIP。所有处理都在本机浏览器进行，不会上传图片。',
@@ -1260,7 +1297,82 @@ go.addEventListener('click',async()=>{
     ['取消', 'Cancel'],
     ['请先选择漫画文件夹或漫画文件。', 'Please select a manga folder or manga file first.'],
     ['编码逻辑参考 srokl/xtcjsapp（MIT）及本项目现有实现。',
-     'Encoding logic is based on srokl/xtcjsapp (MIT) and this project’s existing implementation.']
+     'Encoding logic is based on srokl/xtcjsapp (MIT) and this project’s existing implementation.'],
+
+    // Additional interface text that was previously left partially untranslated.
+    ['③ 日漫分割设置与转换', '③ Japanese Manga Splitting & Conversion'],
+    ['③ 转换设置', '③ Conversion Settings'],
+    ['选择日漫总文件夹，自动裁切白边、识别彩页和双页扫描；单页可保持整页或切成 2/3 个带重叠的横向阅读视窗。保留章节识别、批量合并、XTC/XTCH、预览、图像调节和自动保存等功能。所有处理均在本机浏览器完成，不会上传图片。', 'Select a Japanese manga folder. The converter trims white borders, detects color pages and double-page scans, and can keep pages whole or split them into 2 or 3 overlapping landscape views. It supports chapter detection, batch merging, XTC/XTCH output, previews, image adjustments, and automatic saving. All processing happens locally in your browser; images are never uploaded.'],
+    ['备用：选择 PDF / ZIP / EPUB / CBZ 或多选图片', 'Alternative: Select PDF / ZIP / EPUB / CBZ or multiple images'],
+    ['如果有根目录 Cover.jpg，在整部合并模式下作为第一页', 'Use root-level Cover.jpg as the first page when merging the entire series'],
+    ['尚未选择漫画。支持图片文件夹、PDF、ZIP、CBZ、EPUB。', 'No manga selected. Supported: image folders, PDF, ZIP, CBZ, and EPUB.'],
+    ['选择文件夹或漫画文件后自动生成预览，可用左右箭头查看前 10 页。', 'A preview is generated after selecting a folder or manga file. Use the arrows to view up to the first 10 pages.'],
+    ['第 0 / 0 页', 'Page 0 / 0'],
+    ['所有图片合并为一个 XTC/XTCH 文件。', 'Combine all images into one XTC/XTCH file.'],
+    ['封面之后前几页保持竖屏不分割', 'Keep the first pages after the cover in portrait orientation (no splitting)'],
+    ['图片缩放方式', 'Image scaling mode'],
+    ['铺满屏幕', 'Fill screen'],
+    ['保持原图比例（默认）', 'Preserve original aspect ratio (default)'],
+    ['普通（推荐）', 'Normal (recommended)'],
+    ['积极（尽量裁掉边缘水印）', 'Aggressive (trim edge watermarks where possible)'],
+    ['彩页自动整页保留。铺满屏幕会将页面填满 X3；保持原图比例会等比缩放并在空余处留白，分成 2 份或 3 份时同样生效。宽幅扫描默认尝试检测白色中缝，识别成功时按日漫顺序先输出右页、再输出左页；勾选“整本双页扫描”则即使没有明显白缝也会按中线分开。单页切分使用重叠视窗和切线避让算法。封面始终不切分；也可设置前 N 张图片不切分。', 'Color pages are always kept whole. Fill screen scales each page to fill the X3 display; preserve original aspect ratio keeps the image proportional and leaves blank space where needed. With aspect-ratio mode, you can adjust the overlap between split views; fill-screen mode uses internal cut-line adjustment settings. Wide scans are checked for a white center gutter and, when detected, are output right page first, then left page. Enable “Whole-book double-page scans” to split at the center even without a clear gutter. Covers are never split; you can also keep the first N pages after the cover whole.'],
+    ['彩页自动整页保留；宽幅双页可按中缝分成右页、左页，先输出右页。普通单页按 2 或 3 份切分，并保留重叠；切分位置会尽量避开横向线条。', 'Color pages are kept whole. Wide spreads can be split at the center gutter and output right page first, then left. Regular pages can be split into 2 or 3 overlapping views; cut positions try to avoid horizontal lines.'],
+    ['支持图片文件夹、PDF、ZIP、CBZ、EPUB。', 'Supported: image folders, PDF, ZIP, CBZ, and EPUB.'],
+    ['正在读取图片……', 'Reading images…'],
+    ['已生成 10 页预览；预览使用当前日漫分割和转换设置。', 'Generated 10 preview pages using the current manga splitting and conversion settings.'],
+    ['正在读取文件并建立页面索引……', 'Reading files and building the page index…'],
+    ['没有找到支持的图片或漫画文件。支持 JPG、PNG、WebP、PDF、ZIP、CBZ、EPUB。', 'No supported image or manga files were found. Supported formats: JPG, PNG, WebP, PDF, ZIP, CBZ, and EPUB.'],
+    ['压缩包中没有找到漫画图片。', 'No manga images were found in the archive.'],
+    ['没有识别到章节文件夹。请重新选择包含章节子文件夹的漫画总文件夹。', 'No chapter folders were detected. Please select the main manga folder containing chapter subfolders.'],
+    ['请先选择起始章节和结束章节。', 'Please select the starting and ending chapters first.'],
+    ['已取消', 'Cancelled'],
+    ['没有生成可转换的漫画页面。', 'No manga pages were generated for conversion.'],
+    ['页面数量超过 XTC 容器可表示的上限（65535 页）。', 'The page count exceeds the XTC container limit (65,535 pages).'],
+    ['选择漫画文件夹后，这里会自动生成预览。', 'A preview will be generated here after you select a manga folder.'],
+    ['正在生成前 10 页预览……', 'Generating the first 10 preview pages…'],
+    ['当前设置下没有可预览的图片。', 'No images are available to preview with the current settings.'],
+    ['没有生成可预览的页面。', 'No preview pages were generated.'],
+    ['请重新选择图片。', 'Please select the images again.'],
+    ['所选范围内没有图片。', 'There are no images in the selected range.'],
+    ['已取消选择输出文件夹，尚未开始转换。', 'The output folder selection was cancelled. Conversion has not started.'],
+    ['ZIP 组件加载失败，无法自动打包。请检查网络后刷新页面。', 'Failed to load the ZIP library, so automatic packaging is unavailable. Check your connection and refresh the page.'],
+    ['正在保存文件…', 'Saving files…'],
+    ['全部章节已转换，正在生成单个 ZIP…', 'All chapters have been converted. Creating a single ZIP…'],
+    ['转换失败：', 'Conversion failed: '],
+    ['正在取消…', 'Cancelling…'],
+    ['已读取 ', 'Read '],
+    [' 张图片，识别到 ', ' images; detected '],
+    [' 个章节文件夹。', ' chapter folders.'],
+    ['未分章图片', 'Unsorted images'],
+    ['⚠ 未能识别章节路径，分章模式不可用。请检查目录结构或更换浏览器。', '⚠ Chapter paths could not be detected, so chapter grouping is unavailable. Check the folder structure or try another browser.'],
+    ['找到根目录 Cover.jpg。', 'Found root-level Cover.jpg. '],
+    ['将放在整部合并模式的第一页。', 'It will be used as the first page when merging the entire series.'],
+    ['封面不会加入。', 'The cover will not be included.'],
+    ['未找到根目录 Cover.jpg。', 'No root-level Cover.jpg was found.'],
+    ['章节和图片按自然数字顺序排列。', 'Chapters and images are sorted in natural numeric order.'],
+    ['整部合并：所有章节图片会合并成一个 XTC/XTCH 文件。', 'Merge entire series: images from all chapters are combined into one XTC/XTCH file.'],
+    ['逐章读取图片，完成一本后自动继续下一章。支持时可选择一次输出文件夹自动保存；否则最后下载一个 ZIP。', 'Images are processed chapter by chapter. After one book is complete, the next chapter starts automatically. Choose an output folder for automatic saving where supported; otherwise, download one ZIP at the end.'],
+    ['范围模式：选择起止章节，将范围内章节合并为一本。', 'Range mode: select the starting and ending chapters to merge them into one book.'],
+    ['分组模式：连续每 N 章生成一本，最后不足 N 章也会生成一本。支持时可选择一次输出文件夹自动保存全部成品。', 'Batch mode: create one book for every N consecutive chapters, including any remaining chapters. Choose an output folder to save all books automatically where supported.'],
+    ['当前浏览器不支持选择输出文件夹，将在全部转换完成后下载一个 ZIP。', 'This browser cannot select an output folder. A ZIP file will be downloaded after conversion.'],
+    ['准备转换：', 'Preparing to convert: '],
+    ['正在转换：', 'Converting: '],
+    ['当前图片：', 'Current image: '],
+    ['本书图片：', 'Images in this book: '],
+    ['转换完成！', 'Conversion complete!'],
+    ['图片：', 'Images: '],
+    ['X3 页面：', 'X3 pages: '],
+    ['文件大小：', 'File size: '],
+    ['已触发下载。', 'Download started.'],
+    ['正在生成第 ', 'Creating book '],
+    [' 本：', ': '],
+    ['正在打包 ZIP… ', 'Packaging ZIP… '],
+    ['全部完成！', 'All done!'],
+    ['生成文件：', 'Books created: '],
+    ['章节图片：', 'Chapter images: '],
+    ['总 X3 页面：', 'Total X3 pages: '],
+    ['已自动保存到你选择的文件夹。', 'Files were saved to your selected folder.'],
+    ['已触发一次 ZIP 下载。', 'ZIP download started.']
   ];
 
   const originalTexts = new Map();
@@ -1304,6 +1416,17 @@ go.addEventListener('click',async()=>{
       node.nodeValue = translateText(original, toEnglish);
     }
 
+    // Translate form hints and accessibility labels as well as visible text.
+    const attributeNames = ['placeholder', 'title', 'aria-label'];
+    document.querySelectorAll('input,button,img,[aria-label],[title]').forEach(el => {
+      for (const attr of attributeNames) {
+        if (!el.hasAttribute(attr)) continue;
+        const key = `data-i18n-original-${attr}`;
+        if (!el.hasAttribute(key)) el.setAttribute(key, el.getAttribute(attr));
+        el.setAttribute(attr, translateText(el.getAttribute(key), toEnglish));
+      }
+    });
+
     document.title = toEnglish
       ? 'X3 Japanese Manga Converter (Images / PDF / ZIP / EPUB / CBZ)'
       : 'X3 日漫转换器（图片 / PDF / ZIP / EPUB / CBZ）';
@@ -1328,22 +1451,28 @@ go.addEventListener('click',async()=>{
 
   setLanguage(saved === 'en' ? 'en' : 'zh');
 
-  // 让转换过程中新出现的状态文字也尝试翻译。
+  // Translate text changed or inserted by the converter after the language is selected.
   const observer = new MutationObserver(records => {
     const toEnglish = document.documentElement.lang === 'en';
-    for (const record of records) {
-      if (record.type === 'characterData') {
-        const node = record.target;
+    const translateNode = node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (!node.nodeValue.trim()) return;
         if (!originalTexts.has(node)) originalTexts.set(node, node.nodeValue);
-        const original = originalTexts.get(node);
-        const translated = translateText(original, toEnglish);
+        const translated = translateText(originalTexts.get(node), toEnglish);
         if (node.nodeValue !== translated) node.nodeValue = translated;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        for (const child of collectTextNodes(node)) translateNode(child);
       }
+    };
+    for (const record of records) {
+      if (record.type === 'characterData') translateNode(record.target);
+      if (record.type === 'childList') record.addedNodes.forEach(translateNode);
     }
   });
 
   observer.observe(document.body, {
     subtree: true,
+    childList: true,
     characterData: true
   });
 })();

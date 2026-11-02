@@ -152,7 +152,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <option value="3" selected>分成 3 份</option>
 </select>
 </div>
-<div class="field">
+<div class="field" id="splitOverlapField">
 <label for="splitOverlap">分割重叠像素</label>
 <input id="splitOverlap" type="number" min="0" max="300" value="48">
 </div>
@@ -178,7 +178,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 </select>
 </div>
 </div>
-<p class="hint">彩页自动整页保留。铺满屏幕会将页面填满 X3；保持原图比例会等比缩放并在空余处留白，分成 2 份或 3 份时同样生效。宽幅扫描默认尝试检测白色中缝，识别成功时按日漫顺序先输出右页、再输出左页；勾选“整本双页扫描”则即使没有明显白缝也会按中线分开。单页切分使用重叠视窗和切线避让算法。封面始终不切分；也可设置前 N 张图片不切分。</p>
+<p class="hint" id="splitHelp">彩页自动整页保留。铺满屏幕会将页面填满 X3；保持原图比例会等比缩放并在空余处留白。保持原图比例时可调整分割重叠像素；铺满屏幕时使用内部切线调整参数。宽幅扫描默认尝试检测白色中缝，识别成功时按日漫顺序先输出右页、再输出左页；勾选“整本双页扫描”则即使没有明显白缝也会按中线分开。封面始终不切分；也可设置前 N 张图片不切分。</p>
 
 <div class="row" style="margin-top:12px">
 <div class="field">
