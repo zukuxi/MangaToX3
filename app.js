@@ -490,20 +490,19 @@ function mangaDetectSpreadGutter(s){
  return Math.round(best/scale);
 }
 function mangaViews(s,count,overlap,preserveAspect=false){
- // 三份 + 保持比例：先把已裁白边的页面按比例缩放到宽 792，
- // 再按 528 像素高切成三个横向阅读视窗。旋转后正好是 X3 的 528×792，
- // 不会再把每个视窗缩小塞进页面；重叠量也按最终缩放后的像素计算。
+ // 三份 + 保持比例：先裁掉普通白边，再按原图比例缩放到宽 792。
+ // 每份只取 528px 高，旋转后恰好是 528×792，不把重叠高度缩进页面，
+ // 因此不会在页面上下生成新的留白。三份的起点均匀分布，天然形成重叠。
  if(count===3&&preserveAspect){
   const targetW=792,targetH=528;
   const scaledH=Math.max(1,Math.round(s.height*targetW/s.width));
   const scaled=mangaCanvas(targetW,scaledH),ctx=scaled.getContext('2d');
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   ctx.drawImage(s,0,0,targetW,scaledH);
-  const extra=Math.min(300,Math.max(0,Math.round(overlap)));
-  const viewH=Math.min(scaledH,targetH+extra),max=scaledH-viewH;
+  const viewH=Math.min(scaledH,targetH),max=Math.max(0,scaledH-viewH);
   const tops=[0,Math.round(max/2),max];
   return tops.map((top,i)=>({
-   canvas:mangaMakePage(mangaRotate90(mangaCrop(scaled,0,top,targetW,Math.min(viewH,scaledH-top))),true),
+   canvas:mangaMakePage(mangaRotate90(mangaCrop(scaled,0,top,targetW,Math.min(viewH,scaledH-top))),false),
    index:i+1
   }));
  }
